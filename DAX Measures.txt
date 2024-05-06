@@ -1,0 +1,143 @@
+# Trades = 
+COUNTA(Posiciones[Símbolo])
+/* Cuenta el número de operaciones realizadas basado en la columna 'Símbolo' de la tabla 'Posiciones'. */
+__________________________________________________________________________________________________________________________________
+
+Avg Loss = 
+CALCULATE (
+    AVERAGE(Posiciones[Beneficio]), 
+    Posiciones[Beneficio] < 0
+)
+/* Calcula el beneficio medio de las operaciones que resultaron en pérdidas. */
+__________________________________________________________________________________________________________________________________
+
+Avg Win = 
+CALCULATE (
+    AVERAGE(Posiciones[Beneficio]), 
+    Posiciones[Beneficio] >= 0
+)
+/* Calcula el beneficio medio de las operaciones que resultaron en ganancias. */
+__________________________________________________________________________________________________________________________________
+
+Equity Curve = 
+VAR CurrentTrade = MAX(Transacciones[Date])
+RETURN
+    CALCULATE (
+        [Balance], 
+        FILTER (
+            ALLEXCEPT(Transacciones, Transacciones[Order]),
+            Transacciones[Date] <= CurrentTrade
+        )
+    )
+/* Genera la curva de capital (equity curve) usando el saldo actual y filtrando las transacciones hasta la fecha más reciente. */
+__________________________________________________________________________________________________________________________________
+
+Gross Loss = 
+CALCULATE (
+    [P/L], 
+    Posiciones[Beneficio] < 0
+)
+/* Calcula la pérdida bruta total de todas las operaciones que resultaron en pérdidas. */
+__________________________________________________________________________________________________________________________________
+
+Gross Profit = 
+CALCULATE (
+    [P/L], 
+    Posiciones[Beneficio] > 0
+) - SUM(Posiciones[Swap])
+/* Calcula el beneficio bruto total de todas las operaciones que resultaron en ganancias y resta los costes de swap. */
+__________________________________________________________________________________________________________________________________
+
+Largest Loss Trade = 
+CALCULATE (
+    MIN(Posiciones[Beneficio]), 
+    Posiciones[Beneficio] < 0
+)
+/* Encuentra la operación individual con la mayor pérdida. */
+__________________________________________________________________________________________________________________________________
+
+Largest Profit Trade = 
+CALCULATE (
+    MAX(Posiciones[Beneficio]), 
+    Posiciones[Beneficio] > 0
+)
+/* Encuentra la operación individual con el mayor beneficio. */
+__________________________________________________________________________________________________________________________________
+
+Profit Factor = 
+DIVIDE(
+    CALCULATE(SUM(Posiciones[Beneficio]), Posiciones[Beneficio] > 0) + SUM(Posiciones[Swap]),
+    CALCULATE(SUM(Posiciones[Beneficio]), Posiciones[Beneficio] < 0)
+)
+/* Calcula el factor de beneficio comparando el beneficio total de las operaciones ganadoras con las perdedoras, ajustando por el costo de swap. */
+__________________________________________________________________________________________________________________________________
+
+Recovery Factor = 
+DIVIDE(
+    [P/L], 
+    [Max Drawdown]
+)
+/* Calcula el factor de recuperación comparando el beneficio neto con la mayor reducción de capital (drawdown) experimentada. */
+__________________________________________________________________________________________________________________________________
+
+Win Rate = 
+DIVIDE(
+    CALCULATE([# Trades], Posiciones[Beneficio] >= 0), 
+    [# Trades]
+)
+/* Calcula la tasa de operaciones ganadoras dividiendo el número de operaciones con beneficio no negativo entre el total de operaciones. */
+__________________________________________________________________________________________________________________________________
+
+% Max Drawdown = 
+DIVIDE([Max Drawdown], [Peak Cumulative Profit])
+/* Calcula el porcentaje del mayor drawdown (reducción máxima de capital) respecto al pico máximo de beneficio acumulado. */
+__________________________________________________________________________________________________________________________________
+
+DD Cum Profits = 
+VAR CurrentTrade = MAX(Transacciones[Order])
+RETURN
+    CALCULATE(
+        [Balance],
+        FILTER(
+            ALLSELECTED(Transacciones),
+            Transacciones[Order] <= CurrentTrade
+        )
+    )
+/* Calcula los beneficios acumulados hasta la operación actual, considerando todas las transacciones seleccionadas. */
+__________________________________________________________________________________________________________________________________
+
+Drawdowns = 
+IF(
+    [DD Cum Profits] < [Peak Cumulative Profit],
+    [Peak Cumulative Profit] - [DD Cum Profits], 
+    BLANK()
+)
+/* Determina los drawdowns como la diferencia entre el pico máximo de beneficio acumulado y los beneficios acumulados si esta es negativa; de lo contrario, devuelve un valor en blanco. */
+__________________________________________________________________________________________________________________________________
+
+Max Drawdown = 
+VAR CurrentTrade = MAX(Transacciones[Order])
+VAR TableFilter = CALCULATETABLE(
+    ALLSELECTED(Transacciones),
+    Transacciones[Order] <= CurrentTrade
+)
+RETURN
+    MAXX(
+        TableFilter, 
+        [Drawdowns]
+    )
+/* Encuentra el mayor drawdown (la máxima reducción de capital) hasta la operación actual. */
+__________________________________________________________________________________________________________________________________
+
+Peak Cumulative Profit = 
+VAR CurrentTrade = MAX(Transacciones[Order])
+VAR TableFilter = CALCULATETABLE(
+    ALLSELECTED(Transacciones),
+    Transacciones[Order] <= CurrentTrade
+)
+RETURN
+    MAXX(
+        TableFilter, 
+        [DD Cum Profits]
+    )
+/* Calcula el máximo beneficio acumulado hasta la operación actual. */
